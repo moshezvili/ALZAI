@@ -1,0 +1,27 @@
+# Serving Configuration
+serving:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false
+  workers: 1
+  
+  # Model Settings
+  model:
+    path: "./models/best_model.joblib"
+    threshold: 0.3  # Will be set from training
+    
+  # API Settings
+  api:
+    title: "Clinical ML Prediction API"
+    description: "Binary classification for clinical diagnosis prediction"
+    version: "1.0.0"
+    
+  # Logging
+  logging:
+    level: "INFO"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+  # Health Check
+  health:
+    enabled: true
+    endpoint: "/health"

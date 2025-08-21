@@ -1,0 +1,33 @@
+cross_validation:
+  method: stratified
+  n_splits: 2
+  test_size: 0.3
+feature_engineering:
+  categorical_encoding:
+    cv_folds: 2
+    method: target_encoding
+  missing_values:
+    numeric_strategy: median
+  rolling_window_years: 1
+  scaling:
+    enabled: true
+    method: standard
+  temporal_features:
+  - mean
+hpo:
+  enabled: false
+imbalance:
+  method: none
+mlflow:
+  experiment_name: test_integration_fix
+  tracking_uri: file:C:\Users\moshe\AppData\Local\Temp\tmpeecdoyif/mlruns
+model:
+  algorithm: lightgbm
+  lightgbm:
+    learning_rate: 0.1
+    n_estimators: 5
+    objective: binary
+    random_state: 42
+    verbose: -1
+threshold:
+  method: f1_optimal

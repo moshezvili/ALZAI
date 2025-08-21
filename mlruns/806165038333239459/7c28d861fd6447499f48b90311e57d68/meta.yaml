@@ -1,0 +1,14 @@
+artifact_uri: file:///app/mlruns/806165038333239459/7c28d861fd6447499f48b90311e57d68/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '806165038333239459'
+lifecycle_stage: active
+run_id: 7c28d861fd6447499f48b90311e57d68
+run_name: clinical_binary_classification_v2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755739541669
+status: 1
+tags: []
+user_id: root

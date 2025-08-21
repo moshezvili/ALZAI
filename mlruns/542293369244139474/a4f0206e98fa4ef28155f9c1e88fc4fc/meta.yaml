@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/dev/ALZAI/mlruns/542293369244139474/a4f0206e98fa4ef28155f9c1e88fc4fc/artifacts
+end_time: 1755783462537
+entry_point_name: ''
+experiment_id: '542293369244139474'
+lifecycle_stage: active
+run_id: a4f0206e98fa4ef28155f9c1e88fc4fc
+run_name: test_integration_fix
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755783462274
+status: 4
+tags: []
+user_id: moshe

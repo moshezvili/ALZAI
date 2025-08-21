@@ -1,0 +1,113 @@
+features:
+- patient_id
+- year
+- age
+- gender
+- bmi
+- systolic_bp
+- diastolic_bp
+- cholesterol
+- glucose
+- smoking_status
+- num_visits
+- medications_count
+- lab_abnormal_flag
+- primary_diagnosis
+- additional_diagnoses
+- birth_year
+- target
+- age_group
+- bmi_category
+- noise_feature_0
+- noise_feature_1
+- noise_feature_2
+- noise_feature_3
+- noise_feature_4
+- noise_feature_5
+- noise_feature_6
+- noise_feature_7
+- noise_feature_8
+- noise_feature_9
+missing_values:
+  additional_diagnoses: 0
+  age: 0
+  age_group: 0
+  birth_year: 0
+  bmi: 0
+  bmi_category: 0
+  cholesterol: 0
+  diastolic_bp: 0
+  gender: 0
+  glucose: 0
+  lab_abnormal_flag: 0
+  medications_count: 0
+  noise_feature_0: 0
+  noise_feature_1: 0
+  noise_feature_2: 0
+  noise_feature_3: 0
+  noise_feature_4: 0
+  noise_feature_5: 0
+  noise_feature_6: 0
+  noise_feature_7: 0
+  noise_feature_8: 0
+  noise_feature_9: 0
+  num_visits: 0
+  patient_id: 0
+  primary_diagnosis: 0
+  smoking_status: 0
+  systolic_bp: 0
+  target: 0
+  year: 0
+target_prevalence: !!python/object/apply:numpy.core.multiarray.scalar
+- !!python/object/apply:numpy.dtype
+  args:
+  - f8
+  - false
+  - true
+  state: !!python/tuple
+  - 3
+  - <
+  - null
+  - null
+  - null
+  - -1
+  - -1
+  - 0
+- !!binary |
+  KAt/By3rsT8=
+total_records: 24759
+unique_patients: 5000
+years_covered:
+- !!python/object/apply:numpy.core.multiarray.scalar
+  - &id001 !!python/object/apply:numpy.dtype
+    args:
+    - i8
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - !!binary |
+    3wcAAAAAAAA=
+- !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    4AcAAAAAAAA=
+- !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    4QcAAAAAAAA=
+- !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    4gcAAAAAAAA=
+- !!python/object/apply:numpy.core.multiarray.scalar
+  - *id001
+  - !!binary |
+    4wcAAAAAAAA=

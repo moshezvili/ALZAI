@@ -1,0 +1,28 @@
+cross_validation:
+  method: stratified
+  n_splits: 2
+  test_size: 0.3
+feature_engineering:
+  categorical_encoding:
+    method: target_encoding
+  missing_values:
+    numeric_strategy: median
+  rolling_window_years: 1
+  temporal_features:
+  - mean
+hpo:
+  enabled: false
+imbalance:
+  method: none
+mlflow:
+  experiment_name: test_experiment
+  tracking_uri: file:C:\Users\moshe\AppData\Local\Temp\tmp4e_zud7h/mlruns
+model:
+  algorithm: lightgbm
+  lightgbm:
+    learning_rate: 0.1
+    n_estimators: 10
+    objective: binary
+    random_state: 42
+threshold:
+  method: f1_optimal

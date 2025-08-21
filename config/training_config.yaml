@@ -1,0 +1,223 @@
+# Global
+random_seed: 42
+
+# Data Generation Configuration
+data_generation:
+  num_patients: 5000
+  years_per_patient: 5
+  target_prevalence: 0.07
+  output_format: "parquet"
+  partition_by: ["year"]
+  
+  # Dask Configuration
+  use_dask: true
+  batch_size: 1000
+  n_workers: 4
+  
+  # Missing Value Simulation
+  missing_values:
+    enabled: true
+    rates:
+      cholesterol: 0.05      # 5% missing cholesterol (lab test unavailability)
+      bmi: 0.10             # 10% missing BMI (failed measurements)
+      glucose: 0.03         # 3% missing glucose (incomplete lab panels)
+      blood_pressure: 0.02  # 2% missing blood pressure (equipment issues)
+    
+    # Alternative scenarios for different data quality settings
+    scenarios:
+      high_quality:
+        cholesterol: 0.01
+        bmi: 0.02
+        glucose: 0.005
+        blood_pressure: 0.01
+      
+      standard_practice:
+        cholesterol: 0.05
+        bmi: 0.10
+        glucose: 0.03
+        blood_pressure: 0.02
+      
+      resource_limited:
+        cholesterol: 0.25
+        bmi: 0.15
+        glucose: 0.20
+        blood_pressure: 0.08
+
+# Feature Engineering Configuration
+feature_engineering:
+  rolling_window_years: 3
+  min_periods: 1
+  temporal_features: ["mean", "std", "trend", "min", "max"]
+  categorical_encoding:
+    method: "target_encoding"   # Make sure this is implemented within the pipeline (to avoid leakage between folds)
+    handle_unknown: "ignore"
+    cv_folds: 5  # K-Fold target encoding to prevent leakage
+  
+  # Scaling configuration (added after encoding)
+  scaling:
+    enabled: true
+    method: "standard"  # "standard", "minmax", "robust"
+  
+  # Missing Value Handling (updated for realistic clinical data)
+  missing_values:
+    # Strategy for handling missing values in ML pipeline
+    numeric_strategy: "median"
+    categorical_strategy: "most_frequent"
+    
+    # Advanced missing value handling options
+    advanced_imputation:
+      enabled: false
+      method: "iterative"  # or "knn"
+      max_iter: 10
+      random_state: 42
+    
+    # Missing value indicators (create binary flags for missingness)
+    missing_indicators:
+      enabled: true
+      features: ["bmi", "cholesterol", "glucose", "systolic_bp", "diastolic_bp"]
+      
+    # Threshold for dropping features with too many missing values
+    drop_threshold: 0.50  # Drop features with >50% missing
+
+# Model Training Configuration
+model:
+  algorithm: "lightgbm"  # or "xgboost", "catboost"
+
+  lightgbm:
+    objective: "binary"
+    metric: "auc"
+    boosting_type: "gbdt"
+    num_leaves: 31
+    learning_rate: 0.05
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    min_child_samples: 20
+    max_depth: -1
+    reg_alpha: 0.0
+    reg_lambda: 0.0
+    class_weight: null         # Disabled to avoid conflict with SMOTE
+    random_state: 42
+    n_estimators: 1000
+    # early_stopping_rounds: 100  # Remove; the pipeline passes this through fit()
+
+  xgboost:
+    objective: "binary:logistic"
+    eval_metric: "auc"
+    max_depth: 6
+    learning_rate: 0.05
+    n_estimators: 1000
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.0
+    reg_lambda: 1.0
+    scale_pos_weight: 1        # Disabled because SMOTE is active
+    random_state: 42
+    # early_stopping_rounds: 100  # Remove; the pipeline passes this through fit()
+
+# Class Imbalance Handling
+imbalance:
+  method: "none"    # Temporarily disabled for testing - was "smote"
+  smote:
+    sampling_strategy: 0.1
+    k_neighbors: 5
+    random_state: 42
+
+# Cross Validation
+cross_validation:
+  method: "stratified_temporal"   # Suitable for StratifiedTemporalSplitter
+  n_splits: 5
+  test_size: 0.2
+  gap: 1
+  year_col: "year"
+  group_col: "patient_id"         # Patient-level separation between train/val
+  prev_tolerance: 0.02
+  group_disjoint: true
+
+# Feature Selection (placeholder - implement in create_preprocessing_pipeline if desired)
+feature_selection:
+  method: "recursive_elimination"
+  max_features: 50
+  cv_folds: 3
+  scoring: "roc_auc"
+
+# Memory Management and Performance
+memory:
+  # Data loading and processing
+  chunk_size: 10000
+  max_memory_gb: 4
+  
+  # Dask configuration
+  use_dask: true
+  n_workers: 4
+  threads_per_worker: 2
+  memory_limit: "2GB"
+  
+  # Parquet optimization
+  parquet:
+    engine: "pyarrow"
+    compression: "snappy"
+    row_group_size: 50000
+    
+  # Performance monitoring
+  profiling:
+    enabled: false
+    output_dir: "./profiling"
+
+# Threshold Selection
+threshold:
+  method: "f1_optimal"
+  metric_weights:
+    precision: 0.3
+    recall: 0.7
+
+# Hyperparameter Optimization (Optuna)
+hpo:
+  enabled: true
+  n_trials: 30
+  timeout_sec: null
+  opt_metric: "pr_auc"               # Options: "roc_auc", "pr_auc", "f1", "precision", "recall", "accuracy"
+  algorithms: ["lightgbm", "xgboost", "catboost"]
+  study_name: "clinical_hpo"
+
+# Explainability
+explainability:
+  shap:
+    enabled: true
+    nsample: 2000                   
+    save_plots: true
+    save_table: true
+
+# Experiment Tracking
+mlflow:
+  experiment_name: "clinical_binary_classification_v2"
+  tracking_uri: "file:./mlruns"
+  log_artifacts: true
+  log_model: true
+
+# Model Evaluation
+evaluation:
+  metrics: ["roc_auc", "pr_auc", "f1_score", "precision", "recall", "accuracy"]
+  
+  # Slice analysis
+  slice_analysis:
+    categorical_features: ["gender", "age_group", "smoking_status"]
+    min_samples_per_slice: 100
+    
+  # Data quality analysis
+  data_quality:
+    missing_value_analysis: true
+    completeness_threshold: 0.70  # Flag if dataset completeness < 70%
+    
+    # Performance impact of missing values
+    missing_impact_analysis:
+      enabled: true
+      compare_complete_cases: true
+      missing_pattern_analysis: true
+      
+  # Robustness testing
+  robustness:
+    # Test model performance under different missing value scenarios
+    missing_value_simulation:
+      enabled: true
+      test_scenarios: ["high_quality", "standard_practice", "resource_limited"]

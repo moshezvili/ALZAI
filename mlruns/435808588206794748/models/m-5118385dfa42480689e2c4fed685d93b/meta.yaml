@@ -1,0 +1,10 @@
+artifact_location: file:///C:/dev/ALZAI/mlruns/435808588206794748/models/m-5118385dfa42480689e2c4fed685d93b/artifacts
+creation_timestamp: 1755784030419
+experiment_id: '435808588206794748'
+last_updated_timestamp: 1755784036407
+model_id: m-5118385dfa42480689e2c4fed685d93b
+model_type: null
+name: model
+source_run_id: b87099621f6e4853aa151825e817268e
+status: 2
+status_message: null

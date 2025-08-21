@@ -1,0 +1,121 @@
+cross_validation:
+  gap: 1
+  group_col: patient_id
+  group_disjoint: true
+  method: stratified_temporal
+  n_splits: 5
+  prev_tolerance: 0.02
+  test_size: 0.2
+  year_col: year
+data_generation:
+  num_patients: 50000
+  output_format: parquet
+  partition_by:
+  - year
+  target_prevalence: 0.07
+  years_per_patient: 5
+evaluation:
+  metrics:
+  - roc_auc
+  - pr_auc
+  - f1_score
+  - precision
+  - recall
+  - accuracy
+  slice_analysis:
+    categorical_features:
+    - gender
+    - age_group
+    - smoking_status
+    min_samples_per_slice: 100
+explainability:
+  shap:
+    enabled: true
+    nsample: 2000
+    save_plots: true
+    save_table: true
+feature_engineering:
+  categorical_encoding:
+    handle_unknown: ignore
+    method: target_encoding
+  min_periods: 1
+  missing_values:
+    categorical_strategy: most_frequent
+    numeric_strategy: median
+  rolling_window_years: 3
+  temporal_features:
+  - mean
+  - std
+  - trend
+  - min
+  - max
+feature_selection:
+  cv_folds: 3
+  max_features: 50
+  method: recursive_elimination
+  scoring: roc_auc
+hpo:
+  algorithms:
+  - lightgbm
+  - xgboost
+  - catboost
+  enabled: true
+  n_trials: 30
+  opt_metric: pr_auc
+  study_name: clinical_hpo
+  timeout_sec: null
+imbalance:
+  method: none
+  smote:
+    k_neighbors: 5
+    random_state: 42
+    sampling_strategy: 0.1
+memory:
+  chunk_size: 10000
+  max_memory_gb: 4
+  n_workers: 4
+  use_dask: true
+mlflow:
+  experiment_name: clinical_binary_classification
+  log_artifacts: true
+  log_model: true
+  tracking_uri: file:./mlruns
+model:
+  algorithm: lightgbm
+  lightgbm:
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    boosting_type: gbdt
+    class_weight: null
+    colsample_bytree: 0.8429936902146407
+    feature_fraction: 0.8
+    learning_rate: 0.05
+    lr: 0.006076242824214092
+    max_depth: 9
+    metric: auc
+    min_child_samples: 164
+    n_estimators: 700
+    num_leaves: 118
+    objective: binary
+    random_state: 42
+    reg_alpha: 0.0
+    reg_lambda: 0.0
+    subsample: 0.7432716603817926
+  xgboost:
+    colsample_bytree: 0.8
+    eval_metric: auc
+    learning_rate: 0.05
+    max_depth: 6
+    n_estimators: 1000
+    objective: binary:logistic
+    random_state: 42
+    reg_alpha: 0.0
+    reg_lambda: 1.0
+    scale_pos_weight: 1
+    subsample: 0.8
+random_seed: 42
+threshold:
+  method: f1_optimal
+  metric_weights:
+    precision: 0.3
+    recall: 0.7

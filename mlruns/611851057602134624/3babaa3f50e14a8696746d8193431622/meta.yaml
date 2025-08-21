@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/dev/ALZAI/mlruns/611851057602134624/3babaa3f50e14a8696746d8193431622/artifacts
+end_time: 1755783675814
+entry_point_name: ''
+experiment_id: '611851057602134624'
+lifecycle_stage: active
+run_id: 3babaa3f50e14a8696746d8193431622
+run_name: test_hpo_experiment
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755783666374
+status: 3
+tags: []
+user_id: moshe

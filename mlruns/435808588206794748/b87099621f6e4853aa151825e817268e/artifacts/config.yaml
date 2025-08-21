@@ -1,0 +1,37 @@
+cross_validation:
+  method: stratified
+  n_splits: 2
+  test_size: 0.3
+feature_engineering:
+  categorical_encoding:
+    method: target_encoding
+  missing_values:
+    numeric_strategy: median
+  rolling_window_years: 1
+  temporal_features:
+  - mean
+hpo:
+  algorithms:
+  - lightgbm
+  enabled: true
+  n_trials: 3
+  opt_metric: roc_auc
+imbalance:
+  method: none
+mlflow:
+  experiment_name: test_hpo_experiment
+  tracking_uri: file:C:\Users\moshe\AppData\Local\Temp\tmppcv9ipmj/mlruns
+model:
+  algorithm: lightgbm
+  lightgbm:
+    bagging_fraction: 0.9286478507280399
+    feature_fraction: 0.9017495492278651
+    learning_rate: 0.012924081434464826
+    max_depth: 9
+    min_child_samples: 58
+    n_estimators: 800
+    num_leaves: 101
+    objective: binary
+    random_state: 42
+threshold:
+  method: f1_optimal

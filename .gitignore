@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model artifacts
+models_test*/
+models_*_test/
+catboost_info/
+
+# Logs
+logs/
+*.log
+
+# MLflow
+mlruns/.trash/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Data files (keep structure but ignore large files)
+data/raw/*.parquet
+data/processed/
+data/test/
+
+# Jupyter
+.ipynb_checkpoints/
