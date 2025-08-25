@@ -1,6 +1,10 @@
+batch_size_used: 50
+data_generation_config:
+  dask_enabled: true
+  seed: 42
+  vectorized: true
 features:
 - patient_id
-- year
 - age
 - gender
 - bmi
@@ -15,7 +19,6 @@ features:
 - primary_diagnosis
 - additional_diagnoses
 - birth_year
-- target
 - age_group
 - bmi_category
 - noise_feature_0
@@ -28,86 +31,49 @@ features:
 - noise_feature_7
 - noise_feature_8
 - noise_feature_9
-missing_values:
-  additional_diagnoses: 0
-  age: 0
-  age_group: 0
-  birth_year: 0
-  bmi: 0
-  bmi_category: 0
-  cholesterol: 0
-  diastolic_bp: 0
-  gender: 0
-  glucose: 0
-  lab_abnormal_flag: 0
-  medications_count: 0
-  noise_feature_0: 0
-  noise_feature_1: 0
-  noise_feature_2: 0
-  noise_feature_3: 0
-  noise_feature_4: 0
-  noise_feature_5: 0
-  noise_feature_6: 0
-  noise_feature_7: 0
-  noise_feature_8: 0
-  noise_feature_9: 0
-  num_visits: 0
-  patient_id: 0
-  primary_diagnosis: 0
-  smoking_status: 0
-  systolic_bp: 0
-  target: 0
-  year: 0
-target_prevalence: !!python/object/apply:numpy.core.multiarray.scalar
-- !!python/object/apply:numpy.dtype
-  args:
-  - f8
-  - false
-  - true
-  state: !!python/tuple
-  - 3
-  - <
-  - null
-  - null
-  - null
-  - -1
-  - -1
-  - 0
-- !!binary |
-  KAt/By3rsT8=
-total_records: 24759
-unique_patients: 5000
+- target
+- year
+missing_value_configuration:
+  enabled: true
+  rates:
+    blood_pressure: 0.05
+    bmi: 0.05
+    cholesterol: 0.05
+    glucose: 0.05
+  sample_missing_counts:
+    additional_diagnoses: 0
+    age: 0
+    age_group: 0
+    birth_year: 0
+    bmi: 4
+    bmi_category: 4
+    cholesterol: 2
+    diastolic_bp: 3
+    gender: 0
+    glucose: 4
+    lab_abnormal_flag: 0
+    medications_count: 0
+    noise_feature_0: 0
+    noise_feature_1: 0
+    noise_feature_2: 0
+    noise_feature_3: 0
+    noise_feature_4: 0
+    noise_feature_5: 0
+    noise_feature_6: 0
+    noise_feature_7: 0
+    noise_feature_8: 0
+    noise_feature_9: 0
+    num_visits: 0
+    patient_id: 0
+    primary_diagnosis: 0
+    smoking_status: 0
+    systolic_bp: 3
+    target: 0
+    year: 0
+processing_method: dask
+target_prevalence: 0.1
+total_records: computed_lazily
+unique_patients: 100
 years_covered:
-- !!python/object/apply:numpy.core.multiarray.scalar
-  - &id001 !!python/object/apply:numpy.dtype
-    args:
-    - i8
-    - false
-    - true
-    state: !!python/tuple
-    - 3
-    - <
-    - null
-    - null
-    - null
-    - -1
-    - -1
-    - 0
-  - !!binary |
-    3wcAAAAAAAA=
-- !!python/object/apply:numpy.core.multiarray.scalar
-  - *id001
-  - !!binary |
-    4AcAAAAAAAA=
-- !!python/object/apply:numpy.core.multiarray.scalar
-  - *id001
-  - !!binary |
-    4QcAAAAAAAA=
-- !!python/object/apply:numpy.core.multiarray.scalar
-  - *id001
-  - !!binary |
-    4gcAAAAAAAA=
-- !!python/object/apply:numpy.core.multiarray.scalar
-  - *id001
-  - !!binary |
-    4wcAAAAAAAA=
+- 2015
+- 2016

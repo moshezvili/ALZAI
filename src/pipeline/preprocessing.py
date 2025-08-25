@@ -6,13 +6,10 @@ import pandas as pd
 import numpy as np
 import logging
 import time
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import TimeSeriesSplit
-import joblib
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -190,69 +187,6 @@ class DataValidator:
         for feature in ['age', 'gender', 'year', 'patient_id']:
             self.add_rule(feature, 'missing_rate', max_rate=0.01)
 
-class TemporalSplitter:
-    """Create temporal splits for time series cross-validation."""
-    
-    def __init__(self, 
-                 n_splits: int = 5,
-                 test_size: float = 0.2,
-                 gap: int = 1):
-        """
-        Initialize temporal splitter.
-        
-        Args:
-            n_splits: Number of CV folds
-            test_size: Size of test set
-            gap: Gap between train and test (years)
-        """
-        self.n_splits = n_splits
-        self.test_size = test_size
-        self.gap = gap
-    
-    def split(self, X: pd.DataFrame, y=None, groups=None) -> List[Tuple[np.ndarray, np.ndarray]]:
-        """Generate temporal splits."""
-        if 'year' not in X.columns:
-            raise ValueError("DataFrame must contain 'year' column for temporal splitting")
-        
-        years = sorted(X['year'].unique())
-        n_years = len(years)
-        
-        splits = []
-        
-        # Calculate split points
-        test_years_count = max(1, int(n_years * self.test_size))
-        
-        for i in range(self.n_splits):
-            # Calculate test years for this split
-            test_start_idx = n_years - test_years_count - i * (test_years_count // 2)
-            test_start_idx = max(self.gap + 1, test_start_idx)
-            
-            if test_start_idx >= n_years:
-                continue
-            
-            test_end_idx = min(test_start_idx + test_years_count, n_years)
-            train_end_idx = test_start_idx - self.gap
-            
-            if train_end_idx <= 0:
-                continue
-            
-            # Get year ranges
-            train_years = years[:train_end_idx]
-            test_years = years[test_start_idx:test_end_idx]
-            
-            # Create masks
-            train_mask = X['year'].isin(train_years)
-            test_mask = X['year'].isin(test_years)
-            
-            train_indices = X.index[train_mask].values
-            test_indices = X.index[test_mask].values
-            
-            if len(train_indices) > 0 and len(test_indices) > 0:
-                splits.append((train_indices, test_indices))
-        
-        logger.info(f"Created {len(splits)} temporal splits")
-        return splits
-
 class DataScaler(BaseEstimator, TransformerMixin):
     """Scale numeric features while preserving categorical features."""
     
@@ -303,31 +237,3 @@ class DataScaler(BaseEstimator, TransformerMixin):
         elapsed_time = time.time() - start_time
         logger.info(f"Scaling completed in {elapsed_time:.2f} seconds")
         return X_transformed
-
-def save_preprocessor(preprocessor: BaseEstimator, path: str):
-    """Save fitted preprocessor to disk."""
-    joblib.dump(preprocessor, path)
-    logger.info(f"Preprocessor saved to {path}")
-
-def load_preprocessor(path: str) -> BaseEstimator:
-    """Load fitted preprocessor from disk."""
-    preprocessor = joblib.load(path)
-    logger.info(f"Preprocessor loaded from {path}")
-    return preprocessor
-
-def create_preprocessing_summary(X_before: pd.DataFrame, 
-                               X_after: pd.DataFrame) -> Dict[str, Any]:
-    """Create summary of preprocessing transformations."""
-    summary = {
-        'shape_before': X_before.shape,
-        'shape_after': X_after.shape,
-        'features_added': X_after.shape[1] - X_before.shape[1],
-        'missing_values_before': X_before.isnull().sum().sum(),
-        'missing_values_after': X_after.isnull().sum().sum(),
-        'memory_usage_mb': {
-            'before': X_before.memory_usage(deep=True).sum() / 1024 / 1024,
-            'after': X_after.memory_usage(deep=True).sum() / 1024 / 1024
-        }
-    }
-    
-    return summary

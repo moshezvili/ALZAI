@@ -1,0 +1,139 @@
+# Docker Test Configuration - Minimal dataset for testing
+random_seed: 42
+
+# Data Generation Configuration - Very small for Docker testing
+data_generation:
+  num_patients: 100             # Minimal for testing
+  years_per_patient: 2          # Just 2 years per patient
+  target_prevalence: 0.1        # Higher prevalence for easier testing
+  output_format: "parquet"
+  partition_by: ["year"]
+  
+  # Dask Configuration - Disabled for testing
+  use_dask: false
+  batch_size: 50               # Very small batches
+  n_workers: 1
+  
+  # Missing Value Simulation - Minimal
+  missing_values:
+    enabled: true
+    rates:
+      cholesterol: 0.05
+      bmi: 0.05
+      glucose: 0.05
+      blood_pressure: 0.05
+
+# Preprocessing Configuration - Simplified
+preprocessing:
+  # Missing value handling
+  missing_values:
+    strategy: "median"         # Simple median imputation
+    
+  # Temporal features - Minimal window
+  temporal_features:
+    enabled: true
+    window_years: 2            # Reduced from 3 years
+    aggregations: ["mean"]     # Only mean, no std/min/max for speed
+    
+  # Categorical encoding
+  categorical_encoding:
+    method: "onehot"
+    handle_unknown: "ignore"
+    drop_first: true
+    
+  # Data scaling
+  scaling:
+    method: "standard"
+    feature_range: null
+
+# Feature Selection - Very minimal
+feature_selection:
+  enabled: true
+  method: "rfe"                # Recursive Feature Elimination
+  n_features: 10               # Keep only 10 features for testing
+  estimator: "lightgbm"
+  memory_limit_gb: 0.5         # Very low memory limit
+
+# Cross-validation - Minimal
+cross_validation:
+  enabled: true
+  method: "time_series"
+  n_splits: 3                  # Reduced from 5
+  test_size: 0.3
+  gap_years: 0                 # No gap for small dataset
+  group_column: "patient_id"
+
+# Model Configuration - Single model for testing
+models:
+  lightgbm:
+    enabled: true
+    params:
+      objective: "binary"
+      metric: "binary_logloss"
+      boosting_type: "gbdt"
+      num_leaves: 10             # Reduced complexity
+      max_depth: 3               # Shallow trees
+      min_data_in_leaf: 5        # Small min samples
+      feature_fraction: 0.8
+      bagging_fraction: 0.8
+      bagging_freq: 5
+      lambda_l1: 0.1
+      lambda_l2: 0.1
+      min_gain_to_split: 0.0
+      verbose: -1
+    hpo:
+      enabled: false             # Disable HPO for testing
+      
+  xgboost:
+    enabled: false               # Disable for faster testing
+    
+  catboost:
+    enabled: false               # Disable for faster testing
+
+# Hyperparameter Optimization - Disabled
+hyperparameter_optimization:
+  enabled: false
+  engine: "optuna"
+  n_trials: 5                   # Very few trials if enabled
+  timeout: 300                  # 5 minutes max
+
+# Class Imbalance Handling - Simple SMOTE
+imbalance:
+  method: "smote"
+  smote:
+    sampling_strategy: 0.5      # Higher sampling for small dataset
+    k_neighbors: 3              # Fewer neighbors for small dataset
+    random_state: 42
+
+# Threshold Optimization - Simple
+threshold_optimization:
+  enabled: true
+  method: "f1"
+  cv_folds: 3                   # Fewer folds
+
+# MLflow Configuration
+mlflow:
+  enabled: true
+  experiment_name: "clinical_ml_docker_test"
+  tracking_uri: "file:///app/mlruns"
+  artifact_location: "file:///app/mlruns"
+
+# Dask Configuration - Minimal for free servers
+dask_config:
+  enabled: false                # Disabled for Docker testing
+  n_workers: 1
+  threads_per_worker: 1
+  memory_limit: "256MB"         # Very low memory
+  processes: false
+
+# Monitoring and Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Performance Settings
+performance:
+  n_jobs: 1                     # Single thread for Docker testing
+  memory_limit_gb: 0.5          # Very low memory limit
+  early_stopping: true
+  early_stopping_rounds: 10

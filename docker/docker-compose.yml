@@ -15,9 +15,9 @@ services:
     command: >
       bash -c "
         echo 'Generating synthetic data...' &&
-        python src/data_generation/generate_clinical_data.py --config config/training_config.yaml --output_dir data/raw &&
+        python src/data_generation/generate_clinical_data.py --config config/training_config_docker_test.yaml --output_dir data/raw &&
         echo 'Training model...' &&
-        python src/pipeline/training_pipeline.py --config config/training_config.yaml --data data/raw/clinical_data.parquet --output models
+        python src/pipeline/training_pipeline.py --config config/training_config_docker_test.yaml --data data/raw/clinical_data.parquet --output models
       "
     networks:
       - clinical-ml-network

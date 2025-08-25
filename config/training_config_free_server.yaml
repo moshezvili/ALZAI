@@ -1,0 +1,148 @@
+# Training Configuration for Free/Small Servers
+# Optimized for: Heroku Free, Railway, PythonAnywhere, etc.
+# Expected resources: 512MB-1GB RAM, 1 CPU core, limited processing time
+
+# Global
+random_seed: 42
+
+# Data Generation Configuration - Minimal dataset
+data_generation:
+  num_patients: 500             # Very small dataset for free servers
+  years_per_patient: 2          # Minimal years to reduce data size
+  target_prevalence: 0.07
+  output_format: "parquet"
+  partition_by: ["year"]
+  
+  # Dask Configuration - Disabled for free servers
+  use_dask: false
+  batch_size: 100               # Very small batches
+  n_workers: 1
+  
+  # Missing Value Simulation - Simplified
+  missing_values:
+    enabled: true
+    rates:
+      cholesterol: 0.05
+      bmi: 0.10
+      glucose: 0.03
+      blood_pressure: 0.02
+
+# Feature Engineering Configuration - Minimal
+feature_engineering:
+  rolling_window_years: 2       # Reduced window
+  min_periods: 1
+  temporal_features: ["mean", "std"]  # Only basic features
+
+# Preprocessing Configuration - Conservative
+preprocessing:
+  missing_values:
+    strategy: "simple"          # Use simple imputation
+    categorical_strategy: "most_frequent"
+    numerical_strategy: "median"
+  
+  scaling:
+    method: "standard"
+    feature_range: [0, 1]
+    
+  feature_selection:
+    enabled: false              # Disabled to save processing time
+    method: "mutual_info"
+    k_features: 20
+    
+  outlier_detection:
+    enabled: false              # Disabled to save resources
+    method: "isolation_forest"
+    contamination: 0.05
+    
+  feature_creation:
+    polynomial_features: false   # Disabled to reduce feature count
+    interaction_features: false # Disabled to save memory
+    
+  feature_filtering:
+    enabled: true
+    correlation_threshold: 0.95
+    variance_threshold: 0.01
+    drop_threshold: 0.75        # Drop features with >75% missing
+
+# Model Training Configuration - Lightweight
+model:
+  algorithm: "lightgbm"         # Only LightGBM for free servers
+
+  lightgbm:
+    objective: "binary"
+    metric: "auc"
+    boosting_type: "gbdt"
+    num_leaves: 10              # Very small tree for free servers
+    learning_rate: 0.2          # High LR for fast training
+    feature_fraction: 0.8
+    bagging_fraction: 0.8
+    bagging_freq: 5
+    min_child_samples: 10       # Lower threshold
+    max_depth: 3                # Very limited depth
+    reg_alpha: 0.0
+    reg_lambda: 0.0
+    class_weight: null
+    random_state: 42
+    n_estimators: 50            # Very few trees
+    verbose: -1                 # Suppress output
+
+# Class Imbalance Handling - Disabled
+imbalance:
+  method: "none"                # Disabled to save processing time
+
+# Cross Validation Configuration - Minimal
+cross_validation:
+  n_splits: 3                   # Reduced folds
+  test_size: 0.2
+  gap: 1
+  year_col: "year"
+  group_col: "patient_id"
+  prev_tolerance: 0.05
+  group_disjoint: true
+
+# Processing Configuration - Minimal resources
+processing:
+  # Single-threaded processing only
+  dask_config:
+    n_workers: 1
+    threads_per_worker: 1
+    memory_limit: "128MB"       # Very conservative
+    processes: false
+  
+  # Data loading optimization
+  sample_fraction: 0.5          # Use only 50% of data
+  large_dataset_threshold: 1000 # Very low threshold
+
+# Hyperparameter Optimization - Disabled
+hpo:
+  enabled: false                # Always disabled for free servers
+  n_trials: 3
+  timeout_sec: 120              # 2 minutes max
+  opt_metric: "roc_auc"
+  algorithms: ["lightgbm"]      # Only one algorithm
+  study_name: "clinical_hpo_free"
+
+# Explainability - Disabled
+explainability:
+  shap:
+    enabled: false              # Disabled for free servers
+    nsample: 10
+    save_plots: false
+    save_table: false
+
+# Experiment Tracking - Minimal
+mlflow:
+  experiment_name: "clinical_free_server"
+  tracking_uri: null
+  artifact_uri: null
+
+# Threshold Optimization
+threshold:
+  method: "f1_optimal"          # Fast method
+  
+# Additional settings for free servers
+free_server_optimizations:
+  disable_progress_bars: true   # Reduce console output
+  minimize_logging: true        # Reduce log verbosity
+  skip_validation: false        # Keep basic validation
+  emergency_memory_limit: "64MB"  # Emergency fallback

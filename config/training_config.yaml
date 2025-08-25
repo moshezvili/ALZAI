@@ -1,18 +1,18 @@
 # Global
 random_seed: 42
 
-# Data Generation Configuration
+# Data Generation Configuration - Optimized for free servers
 data_generation:
-  num_patients: 5000
-  years_per_patient: 5
+  num_patients: 1000            # Reduced from 5000 for free servers
+  years_per_patient: 3          # Reduced from 5 for smaller dataset
   target_prevalence: 0.07
   output_format: "parquet"
   partition_by: ["year"]
   
-  # Dask Configuration
-  use_dask: true
-  batch_size: 1000
-  n_workers: 4
+  # Dask Configuration - Minimal for free servers
+  use_dask: false               # Disabled for free servers
+  batch_size: 500               # Smaller batches
+  n_workers: 1                  # Single worker
   
   # Missing Value Simulation
   missing_values:
@@ -87,40 +87,40 @@ model:
     objective: "binary"
     metric: "auc"
     boosting_type: "gbdt"
-    num_leaves: 31
-    learning_rate: 0.05
+    num_leaves: 15              # Reduced from 31 for free servers
+    learning_rate: 0.1          # Increased for faster training with fewer trees
     feature_fraction: 0.8
     bagging_fraction: 0.8
     bagging_freq: 5
     min_child_samples: 20
-    max_depth: -1
+    max_depth: 5                # Limited depth for free servers
     reg_alpha: 0.0
     reg_lambda: 0.0
-    class_weight: null         # Disabled to avoid conflict with SMOTE
+    class_weight: null          # Disabled to avoid conflict with SMOTE
     random_state: 42
-    n_estimators: 1000
+    n_estimators: 100           # Much fewer trees for free servers
     # early_stopping_rounds: 100  # Remove; the pipeline passes this through fit()
 
   xgboost:
     objective: "binary:logistic"
     eval_metric: "auc"
-    max_depth: 6
-    learning_rate: 0.05
-    n_estimators: 1000
+    max_depth: 4                # Reduced depth for free servers
+    learning_rate: 0.1          # Increased for faster training
+    n_estimators: 100           # Much fewer trees
     subsample: 0.8
     colsample_bytree: 0.8
     reg_alpha: 0.0
     reg_lambda: 1.0
-    scale_pos_weight: 1        # Disabled because SMOTE is active
+    scale_pos_weight: 1         # Disabled because SMOTE is active
     random_state: 42
     # early_stopping_rounds: 100  # Remove; the pipeline passes this through fit()
 
 # Class Imbalance Handling
 imbalance:
-  method: "none"    # Temporarily disabled for testing - was "smote"
+  method: "smote"    # Enabled - handles class imbalance
   smote:
-    sampling_strategy: 0.1
-    k_neighbors: 5
+    sampling_strategy: 0.1     # Create 10% additional minority class samples
+    k_neighbors: 5             # 5 nearest neighbors for synthetic sample creation
     random_state: 42
 
 # Cross Validation
@@ -134,24 +134,31 @@ cross_validation:
   prev_tolerance: 0.02
   group_disjoint: true
 
-# Feature Selection (placeholder - implement in create_preprocessing_pipeline if desired)
+# Feature Selection (ACTIVE - implemented in FeatureSelector class)
 feature_selection:
-  method: "recursive_elimination"
-  max_features: 50
-  cv_folds: 3
-  scoring: "roc_auc"
+  method: "recursive_elimination"  # RFE with cross-validation
+  max_features: 50                # Maximum features to select
+  cv_folds: 3                    # Cross-validation folds for selection
+  scoring: "roc_auc"             # Metric for ranking features
 
 # Memory Management and Performance
 memory:
   # Data loading and processing
   chunk_size: 10000
   max_memory_gb: 4
+
+# Processing Configuration - Optimized for small/free servers
+processing:
+  # Distributed processing with Dask (conservative configuration for limited RAM)
+  dask_config:
+    n_workers: 1
+    threads_per_worker: 2
+    memory_limit: "512MB"      # Much safer - only 512MB per worker
+    processes: false           # Use threads for better memory sharing
   
-  # Dask configuration
-  use_dask: true
-  n_workers: 4
-  threads_per_worker: 2
-  memory_limit: "2GB"
+  # Data loading optimization
+  sample_fraction: 0.2        # Increased to 20% since we're using less memory per worker
+  large_dataset_threshold: 50000  # Much lower threshold for free servers
   
   # Parquet optimization
   parquet:
@@ -171,27 +178,27 @@ threshold:
     precision: 0.3
     recall: 0.7
 
-# Hyperparameter Optimization (Optuna)
+# Hyperparameter Optimization (Optuna) - Minimal for free servers
 hpo:
-  enabled: true
+  enabled: false
   n_trials: 30
   timeout_sec: null
   opt_metric: "pr_auc"               # Options: "roc_auc", "pr_auc", "f1", "precision", "recall", "accuracy"
   algorithms: ["lightgbm", "xgboost", "catboost"]
   study_name: "clinical_hpo"
 
-# Explainability
+# Explainability - Minimal for free servers
 explainability:
   shap:
-    enabled: true
-    nsample: 2000                   
-    save_plots: true
+    enabled: false             # Disabled for free servers - memory intensive
+    nsample: 50                # Very small sample if enabled
+    save_plots: false          # Disable to save memory
     save_table: true
 
 # Experiment Tracking
 mlflow:
   experiment_name: "clinical_binary_classification_v2"
-  tracking_uri: "file:./mlruns"
+  tracking_uri: "http://localhost:5000"
   log_artifacts: true
   log_model: true
 

@@ -29,6 +29,12 @@ import argparse
 import joblib
 from datetime import datetime
 
+# Dask for distributed processing
+import dask
+import dask.dataframe as dd
+from dask.distributed import Client
+from dask.diagnostics.progress import ProgressBar
+
 # ML & metrics
 from sklearn.metrics import (
     roc_auc_score, average_precision_score, f1_score,
@@ -172,18 +178,46 @@ class ClinicalMLPipeline:
 
     # ---------- Data ----------
     def load_data(self, data_path: str) -> pd.DataFrame:
-        """Load parquet (file/dir) or CSV."""
-        logger.info(f"Loading data from {data_path}")
+        """Load parquet (file/dir) or CSV with Dask for distributed processing."""
+        logger.info(f"Loading data from {data_path} using Dask")
         p = Path(data_path)
-        if p.suffix.lower() == ".csv":
-            df = pd.read_csv(p)
-        else:
-            # pandas can read a parquet directory as well
-            df = pd.read_parquet(p)
         
-        # Ensure year column is numeric for temporal operations
-        if 'year' in df.columns:
-            df['year'] = pd.to_numeric(df['year'], errors='coerce')
+        try:
+            logger.info("Using Dask for distributed data loading...")
+            # Use Dask readers based on file type
+            if p.suffix.lower() == ".csv":
+                ddf = dd.read_csv(p, assume_missing=True, dtype_backend="pyarrow")
+            else:
+                ddf = dd.read_parquet(p)
+
+            logger.info(f"Dask DataFrame partitions: {ddf.npartitions}")
+
+            # Optional downsampling BEFORE compute to avoid OOM on large datasets
+            sample_frac = float(self.config.get("processing", {}).get("sample_fraction", 1.0))
+            if sample_frac < 1.0:
+                logger.info(f"Sampling {sample_frac:.1%} of data for training (pre-compute)")
+                ddf = ddf.sample(frac=sample_frac, random_state=42)
+
+            # Ensure year column is numeric for temporal operations (in Dask graph)
+            if 'year' in ddf.columns:
+                ddf['year'] = dd.to_numeric(ddf['year'], errors='coerce')
+
+            # Convert to pandas for ML training
+            with ProgressBar():
+                df = ddf.compute()
+            logger.info(f"Converted Dask DataFrame to pandas: {df.shape}")
+                
+        except Exception as e:
+            logger.warning(f"Dask loading failed: {e}. Falling back to pandas.")
+            # Fallback to pandas
+            if p.suffix.lower() == ".csv":
+                df = pd.read_csv(p)
+            else:
+                df = pd.read_parquet(p)
+            
+            # Ensure year column is numeric for temporal operations
+            if 'year' in df.columns:
+                df['year'] = pd.to_numeric(df['year'], errors='coerce')
         
         logger.info(f"Loaded data shape: {df.shape}")
         if "target" in df.columns:
@@ -543,12 +577,21 @@ class ClinicalMLPipeline:
         metrics = evaluator.calculate_metrics(y.to_numpy(), y_pred, y_proba)
         metrics["optimal_threshold"] = float(self.best_threshold)
 
+        # Extract feature names for artifact saving
         pre = self.model.named_steps.get("preprocessing", None)
         if pre is not None and hasattr(pre, "get_feature_names_out"):
             try:
                 self.feature_names = list(pre.get_feature_names_out())
-            except Exception:
-                pass
+                logger.info(f"Extracted {len(self.feature_names)} feature names from preprocessor")
+            except Exception as e:
+                logger.warning(f"Failed to get feature names from preprocessor: {e}")
+                # Fallback: use input column names
+                self.feature_names = list(X.columns)
+                logger.info(f"Using input column names as feature names: {len(self.feature_names)} features")
+        else:
+            # Fallback: use input column names
+            self.feature_names = list(X.columns)
+            logger.info(f"No preprocessor get_feature_names_out, using input columns: {len(self.feature_names)} features")
 
         return metrics
 
@@ -762,59 +805,93 @@ class ClinicalMLPipeline:
         logger.info("Artifacts saved successfully")
 
     # ---------- Orchestration ----------
-    def run_pipeline(self, data_path: str, output_dir: str, skip_shap: bool = False) -> Dict[str, float]:
-        logger.info("Starting complete ML pipeline...")
+    def run_pipeline(self, data_path: str, output_dir: str, skip_shap: bool = True) -> Dict[str, float]:
+        logger.info("Starting complete ML pipeline with Dask distributed processing...")
         experiment_name = self.config.get("mlflow", {}).get("experiment_name", "clinical_ml")
 
-        with self.experiment_tracker.start_run(experiment_name) as run:
-            # Log config
-            self.experiment_tracker.log_params(self.config)
-
-            # Data
-            df = self.load_data(data_path)
-            self.validate_data(df)
-            X, y = self.prepare_features(df)
-
-            # Train
-            cv_metrics = self.train_model(X, y)
-
-            # Evaluate on all data (for report only; real deployment should use holdout)
-            final_metrics = self.evaluate_model(X, y)
-            all_metrics = {**cv_metrics, **final_metrics}
-            self.experiment_tracker.log_metrics(all_metrics)
-
-            # Save artifacts (model, preprocessor, mappings, metrics, config)
-            self.save_artifacts(output_dir, all_metrics)
-
-            # SHAP (sampled) - only if not skipped
-            if not skip_shap:
-                try:
-                    Xsample = X.sample(min(100, len(X)), random_state=42)  # Much smaller sample
-                    self.compute_and_log_shap(Xsample, out_dir=Path(output_dir) / "explain")
-                except Exception as e:
-                    logger.warning(f"SHAP failed: {e}")
+        # Initialize Dask client for distributed processing
+        client = None
+        try:
+            # Initialize Dask client with configuration from config
+            dask_config = self.config.get("processing", {}).get("dask_config", {})
+            
+            # Extra conservative settings for free servers
+            memory_limit = dask_config.get("memory_limit", "256MB")
+            n_workers = dask_config.get("n_workers", 1)
+            threads_per_worker = dask_config.get("threads_per_worker", 1)
+            
+            # Don't initialize Dask if resources are too limited
+            if memory_limit in ["256MB", "128MB"] and n_workers == 1:
+                logger.info("Resource-constrained environment detected. Skipping Dask initialization for single-threaded processing.")
+                client = None
             else:
-                logger.info("Skipping SHAP computation for faster execution")
+                client = Client(
+                    processes=dask_config.get("processes", False),
+                    threads_per_worker=threads_per_worker,
+                    n_workers=n_workers,
+                    memory_limit=memory_limit
+                )
+                logger.info(f"Dask client initialized: {client.dashboard_link}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Dask client: {e}. Continuing with single-threaded processing.")
 
-            # Log directory to MLflow
-            try:
-                self.experiment_tracker.log_artifacts(output_dir)
-                # Create a simple input example for signature inference, avoiding categorical conversion issues
+        try:
+            with self.experiment_tracker.start_run(experiment_name) as run:
+                # Log config
+                self.experiment_tracker.log_params(self.config)
+
+                # Data (with Dask support)
+                df = self.load_data(data_path)
+                self.validate_data(df)
+                X, y = self.prepare_features(df)
+
+                # Train (feature engineering will use Dask if available)
+                cv_metrics = self.train_model(X, y)
+
+                # Evaluate on all data (for report only; real deployment should use holdout)
+                final_metrics = self.evaluate_model(X, y)
+                all_metrics = {**cv_metrics, **final_metrics}
+                self.experiment_tracker.log_metrics(all_metrics)
+
+                # Save artifacts (model, preprocessor, mappings, metrics, config)
+                self.save_artifacts(output_dir, all_metrics)
+
+                # SHAP (sampled) - only if explicitly enabled
+                if not skip_shap:
+                    try:
+                        Xsample = X.sample(min(100, len(X)), random_state=42)  # Much smaller sample
+                        self.compute_and_log_shap(Xsample, out_dir=Path(output_dir) / "explain")
+                    except Exception as e:
+                        logger.warning(f"SHAP failed: {e}")
+                else:
+                    logger.info("Skipping SHAP computation (default behavior for faster training)")
+
+                # Log directory to MLflow
                 try:
-                    input_example = X.sample(min(5, len(X)), random_state=42)
-                    # Convert all categorical columns to strings to avoid schema enforcement issues
-                    for col in input_example.columns:
-                        if input_example[col].dtype == 'object' or input_example[col].dtype.name == 'category':
-                            input_example[col] = input_example[col].astype(str)
-                    self.experiment_tracker.log_model(self.model, "model", input_example=input_example)
-                except Exception as e:
-                    logger.warning(f"Input example failed: {e}, logging model without example")
-                    self.experiment_tracker.log_model(self.model, "model")
-            except Exception:
-                pass
+                    self.experiment_tracker.log_artifacts(output_dir)
+                    # Create a simple input example for signature inference, avoiding categorical conversion issues
+                    try:
+                        input_example = X.sample(min(5, len(X)), random_state=42)
+                        # Convert all categorical columns to strings to avoid schema enforcement issues
+                        for col in input_example.columns:
+                            if input_example[col].dtype == 'object' or input_example[col].dtype.name == 'category':
+                                input_example[col] = input_example[col].astype(str)
+                        self.experiment_tracker.log_model(self.model, "model", input_example=input_example)
+                    except Exception as e:
+                        logger.warning(f"Input example failed: {e}, logging model without example")
+                        self.experiment_tracker.log_model(self.model, "model")
+                except Exception:
+                    pass
 
-            logger.info("Pipeline completed successfully!")
-            roc = final_metrics.get("roc_auc")
+                logger.info("Pipeline completed successfully!")
+                roc = final_metrics.get("roc_auc")
+                return all_metrics
+        
+        finally:
+            # Clean up Dask client
+            if client:
+                client.close()
+                logger.info("Dask client closed")
             pr = final_metrics.get("pr_auc")
             f1 = final_metrics.get("f1_score") or final_metrics.get("f1")
             if roc is not None:
@@ -836,7 +913,7 @@ def main():
     parser.add_argument("--config", type=str, required=True, help="Path to training configuration file")
     parser.add_argument("--data", type=str, required=True, help="Path to training data (parquet dir/file or CSV)")
     parser.add_argument("--output", type=str, default="./models", help="Output directory for artifacts")
-    parser.add_argument("--skip-shap", action="store_true", help="Skip SHAP computation for faster testing")
+    parser.add_argument("--enable-shap", action="store_true", help="Enable SHAP computation (disabled by default for faster training)")
     args = parser.parse_args()
 
     with open(args.config, "r", encoding="utf-8") as f:
@@ -847,7 +924,8 @@ def main():
     np.random.seed(seed)
 
     pipeline = ClinicalMLPipeline(config)
-    pipeline.run_pipeline(args.data, args.output, skip_shap=args.skip_shap)
+    # Skip SHAP by default, only enable if flag is provided
+    pipeline.run_pipeline(args.data, args.output, skip_shap=not args.enable_shap)
 
     print("Training completed! Artifacts in:", args.output)
 

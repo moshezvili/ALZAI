@@ -1,0 +1,73 @@
+version: '3.8'
+
+# GitHub Container Registry version of Docker Compose
+# Uses pre-built images from ghcr.io/moshezvili
+
+services:
+  clinical-ml-training:
+    image: ghcr.io/moshezvili/alzai-training:latest
+    container_name: alzai-training-ghcr
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+      - ../mlruns:/app/mlruns
+    environment:
+      - TRAINING_CONFIG=config/training_config_docker_test.yaml
+      - PYTHONPATH=/app
+    command: >
+      bash -c "
+        echo 'Generating synthetic data...'
+        python src/data_generation/generate_clinical_data.py \
+          --num_patients 100 \
+          --years_per_patient 2 \
+          --output_dir ./data/raw \
+          --prevalence 0.093
+        
+        echo 'Starting training pipeline...'
+        python src/pipeline/training_pipeline.py \
+          --config $$TRAINING_CONFIG \
+          --data data/raw/clinical_data.parquet \
+          --output models
+      "
+    networks:
+      - clinical-ml-network
+
+  clinical-ml-serving:
+    image: ghcr.io/moshezvili/alzai-serving:latest
+    container_name: alzai-serving-ghcr
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../models:/app/models
+    environment:
+      - MODEL_DIR=models
+      - PYTHONPATH=/app
+    depends_on:
+      - clinical-ml-training
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - clinical-ml-network
+
+  mlflow-server:
+    image: python:3.9-slim
+    container_name: alzai-mlflow-ghcr
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../mlruns:/app/mlruns
+    command: >
+      bash -c "
+        pip install mlflow==2.8.1
+        mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri /app/mlruns --default-artifact-root /app/mlruns
+      "
+    networks:
+      - clinical-ml-network
+
+networks:
+  clinical-ml-network:
+    driver: bridge

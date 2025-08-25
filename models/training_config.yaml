@@ -1,121 +1,103 @@
 cross_validation:
-  gap: 1
-  group_col: patient_id
-  group_disjoint: true
-  method: stratified_temporal
-  n_splits: 5
-  prev_tolerance: 0.02
-  test_size: 0.2
-  year_col: year
+  enabled: true
+  gap_years: 0
+  group_column: patient_id
+  method: time_series
+  n_splits: 3
+  test_size: 0.3
+dask_config:
+  enabled: false
+  memory_limit: 256MB
+  n_workers: 1
+  processes: false
+  threads_per_worker: 1
 data_generation:
-  num_patients: 50000
+  batch_size: 50
+  missing_values:
+    enabled: true
+    rates:
+      blood_pressure: 0.05
+      bmi: 0.05
+      cholesterol: 0.05
+      glucose: 0.05
+  n_workers: 1
+  num_patients: 100
   output_format: parquet
   partition_by:
   - year
-  target_prevalence: 0.07
-  years_per_patient: 5
-evaluation:
-  metrics:
-  - roc_auc
-  - pr_auc
-  - f1_score
-  - precision
-  - recall
-  - accuracy
-  slice_analysis:
-    categorical_features:
-    - gender
-    - age_group
-    - smoking_status
-    min_samples_per_slice: 100
-explainability:
-  shap:
-    enabled: true
-    nsample: 2000
-    save_plots: true
-    save_table: true
-feature_engineering:
-  categorical_encoding:
-    handle_unknown: ignore
-    method: target_encoding
-  min_periods: 1
-  missing_values:
-    categorical_strategy: most_frequent
-    numeric_strategy: median
-  rolling_window_years: 3
-  temporal_features:
-  - mean
-  - std
-  - trend
-  - min
-  - max
+  target_prevalence: 0.1
+  use_dask: false
+  years_per_patient: 2
 feature_selection:
-  cv_folds: 3
-  max_features: 50
-  method: recursive_elimination
-  scoring: roc_auc
-hpo:
-  algorithms:
-  - lightgbm
-  - xgboost
-  - catboost
   enabled: true
-  n_trials: 30
-  opt_metric: pr_auc
-  study_name: clinical_hpo
-  timeout_sec: null
+  estimator: lightgbm
+  memory_limit_gb: 0.5
+  method: rfe
+  n_features: 10
+hyperparameter_optimization:
+  enabled: false
+  engine: optuna
+  n_trials: 5
+  timeout: 300
 imbalance:
-  method: none
+  method: smote
   smote:
-    k_neighbors: 5
+    k_neighbors: 3
     random_state: 42
-    sampling_strategy: 0.1
-memory:
-  chunk_size: 10000
-  max_memory_gb: 4
-  n_workers: 4
-  use_dask: true
+    sampling_strategy: 0.5
+logging:
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  level: INFO
 mlflow:
-  experiment_name: clinical_binary_classification
-  log_artifacts: true
-  log_model: true
-  tracking_uri: file:./mlruns
-model:
-  algorithm: lightgbm
+  artifact_location: file:///app/mlruns
+  enabled: true
+  experiment_name: clinical_ml_docker_test
+  tracking_uri: file:///app/mlruns
+models:
+  catboost:
+    enabled: false
   lightgbm:
-    bagging_fraction: 0.8
-    bagging_freq: 5
-    boosting_type: gbdt
-    class_weight: null
-    colsample_bytree: 0.8429936902146407
-    feature_fraction: 0.8
-    learning_rate: 0.05
-    lr: 0.006076242824214092
-    max_depth: 9
-    metric: auc
-    min_child_samples: 164
-    n_estimators: 700
-    num_leaves: 118
-    objective: binary
-    random_state: 42
-    reg_alpha: 0.0
-    reg_lambda: 0.0
-    subsample: 0.7432716603817926
+    enabled: true
+    hpo:
+      enabled: false
+    params:
+      bagging_fraction: 0.8
+      bagging_freq: 5
+      boosting_type: gbdt
+      feature_fraction: 0.8
+      lambda_l1: 0.1
+      lambda_l2: 0.1
+      max_depth: 3
+      metric: binary_logloss
+      min_data_in_leaf: 5
+      min_gain_to_split: 0.0
+      num_leaves: 10
+      objective: binary
+      verbose: -1
   xgboost:
-    colsample_bytree: 0.8
-    eval_metric: auc
-    learning_rate: 0.05
-    max_depth: 6
-    n_estimators: 1000
-    objective: binary:logistic
-    random_state: 42
-    reg_alpha: 0.0
-    reg_lambda: 1.0
-    scale_pos_weight: 1
-    subsample: 0.8
+    enabled: false
+performance:
+  early_stopping: true
+  early_stopping_rounds: 10
+  memory_limit_gb: 0.5
+  n_jobs: 1
+preprocessing:
+  categorical_encoding:
+    drop_first: true
+    handle_unknown: ignore
+    method: onehot
+  missing_values:
+    strategy: median
+  scaling:
+    feature_range: null
+    method: standard
+  temporal_features:
+    aggregations:
+    - mean
+    enabled: true
+    window_years: 2
 random_seed: 42
-threshold:
-  method: f1_optimal
-  metric_weights:
-    precision: 0.3
-    recall: 0.7
+threshold_optimization:
+  cv_folds: 3
+  enabled: true
+  method: f1

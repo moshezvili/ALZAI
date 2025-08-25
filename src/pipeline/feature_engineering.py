@@ -2,7 +2,7 @@
 Feature Engineering Pipeline
 
 This module handles feature preprocessing, temporal aggregations,
-and memory-efficient data processing for the clinical ML pipeline.
+and distributed data processing using Dask for the clinical ML pipeline.
 """
 
 import pandas as pd
@@ -16,11 +16,12 @@ from sklearn.feature_selection import RFE
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold
 from pathlib import Path
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
-    """Create temporal rolling aggregation features."""
+    """Create temporal rolling aggregation features with Dask support."""
     
     def __init__(self, 
                  window_years: int = 3,
@@ -28,7 +29,7 @@ class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
                  features: Optional[List[str]] = None,
                  aggregations: Optional[List[str]] = None):
         """
-        Initialize temporal feature engineer.
+        Initialize temporal feature engineer with Dask enabled by default.
         
         Args:
             window_years: Rolling window size in years
@@ -67,13 +68,25 @@ class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
         # Create new features
         new_features = []
         
-        for feature in self.features:
+        # Progress tracking for features
+        total_operations = len(self.features) * len(self.aggregations) + len(self.features)  # +lag features
+        current_operation = 0
+        
+        logger.info(f"Starting temporal feature creation: {total_operations} operations total")
+        
+        for feature_idx, feature in enumerate(self.features):
             if feature not in X_sorted.columns:
                 continue
                 
+            logger.info(f"Processing feature {feature_idx + 1}/{len(self.features)}: {feature}")
             grouped = X_sorted.groupby('patient_id')[feature]
             
-            for agg in self.aggregations:
+            for agg_idx, agg in enumerate(self.aggregations):
+                current_operation += 1
+                progress_pct = (current_operation / total_operations) * 100
+                
+                logger.info(f"  [{current_operation}/{total_operations}] ({progress_pct:.1f}%) Creating {feature}_{agg}")
+                
                 if agg == 'mean':
                     new_col = f'{feature}_rolling_mean_{self.window_years}y'
                     rolling_result = grouped.rolling(
@@ -105,6 +118,7 @@ class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
                 elif agg == 'trend':
                     # Calculate linear trend using actual year values (not sequential index)
                     new_col = f'{feature}_rolling_trend_{self.window_years}y'
+                    logger.info(f"    Computing trend slopes (this may take longer)...")
                     
                     def calculate_trend_with_years(group):
                         """Calculate slope using actual year values for time axis."""
@@ -137,14 +151,21 @@ class TemporalFeatureEngineer(BaseEstimator, TransformerMixin):
                     
                     trend_result = X_sorted.groupby('patient_id')[feature].apply(calculate_trend_with_years)
                     X_sorted[new_col] = trend_result.values
+                    logger.info(f"    Trend calculation completed for {feature}")
                 
                 new_features.append(new_col)
+                logger.info(f"    ✓ Created {new_col}")
         
         # Add lag features (previous year values) using concat to avoid fragmentation
+        logger.info("Creating lag features...")
         lag_features = {}
-        for feature in self.features:
+        for feature_idx, feature in enumerate(self.features):
             if feature in X_sorted.columns:
+                current_operation += 1
+                progress_pct = (current_operation / total_operations) * 100
+                
                 lag_col = f'{feature}_lag_1y'
+                logger.info(f"  [{current_operation}/{total_operations}] ({progress_pct:.1f}%) Creating {lag_col}")
                 lag_features[lag_col] = X_sorted.groupby('patient_id')[feature].shift(1)
                 new_features.append(lag_col)
         
@@ -366,66 +387,6 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         encoding_map['__default__'] = global_mean
         
         return encoding_map
-
-class MemoryEfficientPreprocessor:
-    """Memory-efficient data preprocessing using chunking."""
-    
-    def __init__(self, chunk_size: int = 10000):
-        """Initialize with chunk size for processing."""
-        self.chunk_size = chunk_size
-        
-    def process_in_chunks(self, 
-                         data_path: Union[str, Path],
-                         output_path: Union[str, Path],
-                         transformers: List[Any]) -> None:
-        """Process large dataset in chunks."""
-        logger.info(f"Processing data in chunks of {self.chunk_size}")
-        
-        # Read data info first
-        sample_df = pd.read_parquet(data_path, nrows=1000)
-        total_rows = len(pd.read_parquet(data_path))
-        
-        # Fit transformers on sample
-        for transformer in transformers:
-            if hasattr(transformer, 'fit'):
-                transformer.fit(sample_df)
-        
-        # Process in chunks
-        processed_chunks = []
-        
-        for chunk_start in range(0, total_rows, self.chunk_size):
-            chunk_end = min(chunk_start + self.chunk_size, total_rows)
-            
-            # Read chunk
-            chunk_df = pd.read_parquet(
-                data_path, 
-                filters=[('__null_dask_index__', '>=', chunk_start),
-                         ('__null_dask_index__', '<', chunk_end)]
-            )
-            
-            # Apply transformers
-            for transformer in transformers:
-                if hasattr(transformer, 'transform'):
-                    chunk_df = transformer.transform(chunk_df)
-            
-            processed_chunks.append(chunk_df)
-            
-            if len(processed_chunks) >= 10:  # Write intermediate results
-                combined_chunk = pd.concat(processed_chunks, ignore_index=True)
-                self._append_to_parquet(combined_chunk, output_path)
-                processed_chunks = []
-        
-        # Write remaining chunks
-        if processed_chunks:
-            combined_chunk = pd.concat(processed_chunks, ignore_index=True)
-            self._append_to_parquet(combined_chunk, output_path)
-    
-    def _append_to_parquet(self, df: pd.DataFrame, output_path: Union[str, Path]) -> None:
-        """Append dataframe to parquet file."""
-        if Path(output_path).exists():
-            df.to_parquet(output_path, mode='append', index=False)
-        else:
-            df.to_parquet(output_path, index=False)
 
 class FeatureSelector(BaseEstimator, TransformerMixin):
     """Memory-aware feature selection."""
